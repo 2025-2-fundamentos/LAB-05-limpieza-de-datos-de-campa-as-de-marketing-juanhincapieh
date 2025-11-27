@@ -50,7 +50,130 @@ def clean_campaign_data():
 
     """
 
-    return
+    import pandas as pd
+    from pathlib import Path
+
+    inputDir = Path("files/input")
+    outputDir = Path("files/output")
+    outputDir.mkdir(parents=True, exist_ok=True)
+
+    dfList = []
+    for filePath in inputDir.glob("*.csv.zip"):
+        df = pd.read_csv(filePath, compression="zip", sep=",")
+        dfList.append(df)
+
+    if not dfList:
+        return
+
+    fullDf = pd.concat(dfList, ignore_index=True)
+
+    clientDf = fullDf[
+        [
+            "client_id",
+            "age",
+            "job",
+            "marital",
+            "education",
+            "credit_default",
+            "mortgage",
+        ]
+    ].copy()
+
+    clientDf["job"] = (
+        clientDf["job"]
+        .astype(str)
+        .str.replace(".", "", regex=False)
+        .str.replace("-", "_", regex=False)
+    )
+
+    clientDf["education"] = (
+        clientDf["education"]
+        .astype(str)
+        .str.replace(".", "_", regex=False)
+    )
+    clientDf["education"] = clientDf["education"].replace("unknown", pd.NA)
+
+    clientDf["credit_default"] = (
+        clientDf["credit_default"].astype(str).str.strip().str.lower() == "yes"
+    ).astype(int)
+
+    clientDf["mortgage"] = (
+        clientDf["mortgage"].astype(str).str.strip().str.lower() == "yes"
+    ).astype(int)
+
+    clientDf = clientDf[
+        [
+            "client_id",
+            "age",
+            "job",
+            "marital",
+            "education",
+            "credit_default",
+            "mortgage",
+        ]
+    ]
+
+    clientDf.to_csv(outputDir / "client.csv", index=False)
+
+    campaignDf = fullDf[
+        [
+            "client_id",
+            "number_contacts",
+            "contact_duration",
+            "previous_campaign_contacts",
+            "previous_outcome",
+            "campaign_outcome",
+            "day",
+            "month",
+        ]
+    ].copy()
+
+    prevSeries = campaignDf["previous_outcome"].astype(str).str.strip().str.lower()
+    campaignDf["previous_outcome"] = (prevSeries == "success").astype(int)
+
+    campSeries = campaignDf["campaign_outcome"].astype(str).str.strip().str.lower()
+    campaignDf["campaign_outcome"] = (campSeries == "yes").astype(int)
+
+    dateSeries = (
+        campaignDf["day"].astype(str)
+        + "-"
+        + campaignDf["month"].astype(str)
+        + "-2022"
+    )
+    lastContactDate = pd.to_datetime(dateSeries, format="%d-%b-%Y", errors="coerce")
+    campaignDf["last_contact_date"] = lastContactDate.dt.strftime("%Y-%m-%d")
+
+    campaignDf = campaignDf[
+        [
+            "client_id",
+            "number_contacts",
+            "contact_duration",
+            "previous_campaign_contacts",
+            "previous_outcome",
+            "campaign_outcome",
+            "last_contact_date",
+        ]
+    ]
+
+    campaignDf.to_csv(outputDir / "campaign.csv", index=False)
+
+    economicsDf = fullDf[
+        [
+            "client_id",
+            "cons_price_idx",
+            "euribor_three_months",
+        ]
+    ].copy()
+
+    economicsDf = economicsDf[
+        [
+            "client_id",
+            "cons_price_idx",
+            "euribor_three_months",
+        ]
+    ]
+
+    economicsDf.to_csv(outputDir / "economics.csv", index=False)
 
 
 if __name__ == "__main__":
